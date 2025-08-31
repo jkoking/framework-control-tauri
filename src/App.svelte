@@ -2,11 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import { fade } from "svelte/transition";
   import { flip } from "svelte/animate";
-  import { DefaultService } from "./api";
   import DeviceHeader from "./components/DeviceHeader.svelte";
   import FanControl from "./components/FanControl.svelte";
   import Panel from "./components/Panel.svelte";
-  import { OpenAPI } from "./api";
 
   let healthy: boolean = false;
   let cliPresent: boolean = true;

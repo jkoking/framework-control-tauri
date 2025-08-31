@@ -1,34 +1,17 @@
-# Web generated OpenAPI spec and client
-web/openapi.json
-web/src/api/
-web/node_modules/
-
-# Web build/cache
-web/dist/
-web/.vite/
-web/.svelte-kit/
-
-# Service build/cache
-service/target
-service/target/wix/
-
-# Env files (keep example if present)
-web/.env
-web/.env.*
-service/.env
-service/.env.*
-!web/.env.example
-
-# OS junk
 .DS_Store
+node_modules
+/build
+/.svelte-kit
+/package
+.env
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
 Thumbs.db
-
-# Editors/IDEs
 .vscode/
 .idea/
 *.iml
-
-# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*

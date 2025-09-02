@@ -1,124 +1,65 @@
 use crate::config; // for save/load
 use crate::state::AppState;
-use crate::types::{CliOutput, ConfigEnvelope, PartialConfig, SystemInfoEnvelope, UpdateResult};
-use serde_json::Value;
-use poem::web::Data;
-use poem_openapi::{param::Header, payload::Json, OpenApi};
+use crate::types::{Config, PartialConfig, SystemInfoEnvelope};
 use sysinfo::System;
 use tracing::{error, info};
+use anyhow::Result;
 
-pub struct Api;
+pub struct Api {
+    state: AppState,
+}
 
-#[OpenApi]
 impl Api {
-    /// Health: returns overall service health and CLI presence
-    #[oai(path = "/api/health", method = "get", operation_id = "health")]
-    async fn health(&self, state: Data<&AppState>) -> Json<Value> {
-        let cli_present = state.cli.is_some();
-        Json(serde_json::json!({ "ok": true, "cli_present": cli_present }))
+pub(super) async fn new() -> Self {
+        Self { state: crate::state::AppState::initialize().await  }
     }
 
-    
+    /// Health: returns overall service health and CLI presence
+    pub(super) async fn health(&self) -> bool {
+        self.state.cli.is_some()
+    }
 
     /// Power info
-    #[oai(path = "/api/power", method = "get", operation_id = "getPower")]
-    async fn get_power(&self, state: Data<&AppState>) -> Json<CliOutput> {
-        let Some(cli) = &state.cli else {
-            return Json(CliOutput {
-                ok: false,
-                stdout: None,
-                error: Some("framework_tool not found".into()),
-            });
-        };
-        match cli.power().await {
-            Ok(output) => Json(CliOutput {
-                ok: true,
-                stdout: Some(output),
-                error: None,
-            }),
-            Err(e) => {
-                error!("power exec error: {}", e);
-                Json(CliOutput {
-                    ok: false,
-                    stdout: None,
-                    error: Some(e),
-                })
-            }
+    pub(super) async fn get_power(&self) -> Result<String, String> {
+        match &self.state.cli {
+            Some(cli) => match cli.power().await {
+                Ok(output) => Ok(output),
+                Err(e) => Err(e),
+            },
+            None => return Err("framework_tool not found".into()),
         }
     }
 
     /// Thermal info
-    #[oai(path = "/api/thermal", method = "get", operation_id = "getThermal")]
-    async fn get_thermal(&self, state: Data<&AppState>) -> Json<CliOutput> {
-        let Some(cli) = &state.cli else {
-            return Json(CliOutput {
-                ok: false,
-                stdout: None,
-                error: Some("framework_tool not found".into()),
-            });
-        };
-        match cli.thermal().await {
-            Ok(output) => Json(CliOutput {
-                ok: true,
-                stdout: Some(output),
-                error: None,
-            }),
-            Err(e) => Json(CliOutput {
-                ok: false,
-                stdout: None,
-                error: Some(e),
-            }),
+    pub(super) async fn get_thermal(&self) -> Result<String, String> {
+        match &self.state.cli {
+            Some(cli) => match cli.thermal().await {
+                Ok(output) => Ok(output),
+                Err(e) => Err(e),
+            },
+            None => return Err("framework_tool not found".into()),
         }
     }
 
     /// Versions
-    #[oai(path = "/api/versions", method = "get", operation_id = "getVersions")]
-    async fn get_versions(&self, state: Data<&AppState>) -> Json<CliOutput> {
-        let Some(cli) = &state.cli else {
-            return Json(CliOutput {
-                ok: false,
-                stdout: None,
-                error: Some("framework_tool not found".into()),
-            });
-        };
-        match cli.versions().await {
-            Ok(output) => Json(CliOutput {
-                ok: true,
-                stdout: Some(output),
-                error: None,
-            }),
-            Err(e) => Json(CliOutput {
-                ok: false,
-                stdout: None,
-                error: Some(e),
-            }),
+    pub(super) async fn get_versions(&self) -> Result<String, String> {
+        match &self.state.cli {
+            Some(cli) => match cli.versions().await {
+                Ok(output) => Ok(output),
+                Err(e) => Err(e),
+            },
+            None => return Err("framework_tool not found".into()),
         }
     }
 
     /// Get config
-    #[oai(path = "/api/config", method = "get", operation_id = "getConfig")]
-    async fn get_config(&self, state: Data<&AppState>) -> Json<ConfigEnvelope> {
-        let cfg = state.config.read().await.clone();
-        Json(ConfigEnvelope {
-            ok: true,
-            config: cfg,
-        })
+    pub(super) async fn get_config(&self) -> Config {
+        self.state.config.read().await.clone()
     }
 
     /// Set config (partial)
-    #[oai(path = "/api/config", method = "post", operation_id = "setConfig")]
-    async fn set_config(
-        &self,
-        state: Data<&AppState>,
-        #[oai(name = "Authorization")] auth: Header<String>,
-        req: Json<PartialConfig>,
-    ) -> Json<UpdateResult> {
-        let provided = auth.0.as_str().strip_prefix("Bearer ").unwrap_or("").trim();
-        if !state.is_valid_token(Some(provided)) {
-            return Json(UpdateResult { ok: false });
-        }
-        let req = req.0;
-        let mut merged = state.config.read().await.clone();
+    async fn set_config(&self,req: PartialConfig,) -> Result<(), String> {
+        let mut merged = self.state.config.read().await.clone();
         if let Some(fan) = req.fan {
             let mut new_fan = merged.fan.clone();
             // Overwrite sections only if provided
@@ -130,19 +71,18 @@ impl Api {
         }
         if let Err(e) = config::save(&merged) {
             error!("config save error: {}", e);
-            return Json(UpdateResult { ok: false });
+            return Err(format!("config save error: {}", e));
         }
         {
-            let mut w = state.config.write().await;
+            let mut w = self.state.config.write().await;
             *w = merged;
         }
         info!("set_config applied successfully");
-        Json(UpdateResult { ok: true })
+        return Ok(())
     }
 
     /// System info
-    #[oai(path = "/api/system", method = "get", operation_id = "getSystemInfo")]
-    async fn get_system_info(&self) -> Json<SystemInfoEnvelope> {
+    async fn get_system_info(&self) -> SystemInfoEnvelope {
         let sys = System::new_all();
         let mut cpu = sys.global_cpu_info().brand().trim().to_string();
         if cpu.is_empty() {
@@ -153,13 +93,13 @@ impl Api {
         let mem_mb = sys.total_memory() / 1024 / 1024;
         let os = System::name().unwrap_or_else(|| "Unknown OS".into());
         let dgpu = pick_dedicated_gpu(&get_gpu_names().await);
-        Json(SystemInfoEnvelope {
+        SystemInfoEnvelope {
             ok: true,
             cpu,
             memory_total_mb: mem_mb,
             os,
             dgpu,
-        })
+        }
     }
 }
 

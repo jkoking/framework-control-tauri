@@ -1,4 +1,10 @@
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+mod cli;
+mod config;
+mod routes;
+mod state;
+mod tasks;
+pub mod types;
+
 pub fn run() {
   tauri::Builder::default()
     .setup(|app| {

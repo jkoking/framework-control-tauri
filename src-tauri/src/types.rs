@@ -1,8 +1,7 @@
-use poem_openapi::{Enum, Object};
 use serde::{Deserialize, Serialize};
 
 // Core config types
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub fan: FanControlConfig,
@@ -10,19 +9,16 @@ pub struct Config {
 
 impl Default for Config { fn default() -> Self { Self { fan: FanControlConfig::default() } } }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Enum, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FanControlMode {
     #[default]
-    #[oai(rename = "disabled")]
     Disabled,
-    #[oai(rename = "manual")]
     Manual,
-    #[oai(rename = "curve")]
     Curve,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FanControlConfig {
     #[serde(default)]
     pub mode: FanControlMode,
@@ -35,10 +31,10 @@ pub struct FanControlConfig {
     pub calibration: Option<FanCalibration>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManualConfig { pub duty_pct: u32 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurveConfig {
     #[serde(default = "default_sensor")] pub sensor: String,
     #[serde(default = "default_points")] pub points: Vec<[u32; 2]>,
@@ -55,25 +51,25 @@ fn default_hysteresis_c() -> u32 { 2 }
 fn default_rate_limit_pct_per_step() -> u32 { 100 }
 
 // API envelope types
-#[derive(Serialize, Object)]
+#[derive(Serialize)]
 pub struct CliOutput {
     pub ok: bool,
     pub stdout: Option<String>,
     pub error: Option<String>,
 }
 
-#[derive(Serialize, Object)]
+#[derive(Serialize)]
 pub struct ConfigEnvelope {
     pub ok: bool,
     pub config: Config,
 }
 
-#[derive(Serialize, Object)]
+#[derive(Serialize)]
 pub struct UpdateResult {
     pub ok: bool,
 }
 
-#[derive(Serialize, Object)]
+#[derive(Serialize)]
 pub struct SystemInfoEnvelope {
     pub ok: bool,
     pub cpu: String,
@@ -82,10 +78,10 @@ pub struct SystemInfoEnvelope {
     pub dgpu: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Object)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PartialConfig { pub fan: Option<PartialFanControlConfig> }
 
-#[derive(Debug, Clone, Deserialize, Object, Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct PartialFanControlConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<FanControlMode>,
@@ -98,7 +94,7 @@ pub struct PartialFanControlConfig {
 }
 
 // Fan calibration types
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FanCalibration {
     /// Calibration data points: [duty_pct, rpm]
     pub points: Vec<[u32; 2]>,
